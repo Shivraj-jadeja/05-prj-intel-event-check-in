@@ -1,31 +1,36 @@
 /* Intel Summit Check-In — script.js */
 
-/* --- Config & element refs --- */
+/* --- Config & selectors --- */
 const ATTENDANCE_GOAL = 50;
 const els = {
-  form: document.querySelector('#checkin-form'),
-  nameInput: document.querySelector('#attendee-name'),
-  teamSelect: document.querySelector('#team-select'),
+  form: document.querySelector('#checkInForm'),
+  nameInput: document.querySelector('#attendeeName'),
+  teamSelect: document.querySelector('#teamSelect'),
   greet: document.querySelector('#greeting'),
-  totalCount: document.querySelector('#total-count'),
+  totalCount: document.querySelector('#attendeeCount'),
   teamCounts: {
-    'water-wise': document.querySelector('#water-count') || document.querySelector('[data-team="water-wise"] .team-count'),
-    'net-zero': document.querySelector('#netzero-count') || document.querySelector('[data-team="net-zero"] .team-count'),
-    'renewables': document.querySelector('#renewables-count') || document.querySelector('[data-team="renewables"] .team-count'),
+    water: document.querySelector('#waterCount'),
+    zero: document.querySelector('#zeroCount'),
+    power: document.querySelector('#powerCount'),
   },
-  progressBar: document.querySelector('#progress-bar'),
-  progressLabel: document.querySelector('#progress-label'),
+  progressBar: document.querySelector('#progressBar'),
   celebration: document.querySelector('#celebration'),
   attendeeList: document.querySelector('#attendee-list'),
+  toggleAllBtn: document.querySelector('#toggleAllBtn'),
+  teamCards: document.querySelectorAll('.team-card[data-team]'),
 };
 
-/* --- Persistent app state --- */
+/* --- Persistent state --- */
 const STORAGE_KEY = 'intelSummitCheckIn.v1';
 const state = {
   total: 0,
-  teams: { 'water-wise': 0, 'net-zero': 0, 'renewables': 0 },
+  teams: { water: 0, zero: 0, power: 0 },
   attendees: [], // { name, team, ts }
 };
+
+/* View filter state for collapsible list */
+let currentFilter = null;   // 'water' | 'zero' | 'power' | null
+let listVisible = false;
 
 /* Load state from localStorage */
 function loadState() {
@@ -51,54 +56,73 @@ function saveState() {
   }
 }
 
-/* --- Rendering --- */
-
-/* Update total and team counters */
+/* Update totals and per-team counters */
 function renderTotals() {
   if (els.totalCount) els.totalCount.textContent = String(state.total);
-  for (const [teamKey, count] of Object.entries(state.teams)) {
-    const el = els.teamCounts[teamKey];
-    if (el) el.textContent = String(count);
+  for (const [k, v] of Object.entries(state.teams)) {
+    const el = els.teamCounts[k];
+    if (el) el.textContent = String(v);
   }
 }
 
-/* Update progress bar and label */
+/* Update progress bar fill */
 function renderProgress() {
   const pct = Math.min(100, Math.round((state.total / ATTENDANCE_GOAL) * 100));
-  if (els.progressBar) {
-    els.progressBar.style.width = pct + '%';
-    els.progressBar.setAttribute('aria-valuenow', String(pct));
-    els.progressBar.setAttribute('aria-valuemax', '100');
-  }
-  if (els.progressLabel) els.progressLabel.textContent = `${pct}% of ${ATTENDANCE_GOAL}`;
+  if (els.progressBar) els.progressBar.style.width = pct + '%';
 }
 
-/* Render attendee list (most recent first) */
-function renderAttendeeList() {
+/* Render attendee list with optional filter */
+function renderAttendeeList(filter = null) {
   if (!els.attendeeList) return;
   els.attendeeList.innerHTML = '';
-  for (const a of [...state.attendees].reverse()) {
+  const data = [...state.attendees]
+    .filter(a => (filter ? a.team === filter : true))
+    .reverse();
+  for (const a of data) {
     const li = document.createElement('li');
     li.className = 'attendee-row';
     li.innerHTML = `
       <span class="attendee-name">${escapeHTML(a.name)}</span>
-      <span class="attendee-dot ${a.team}"></span>
       <span class="attendee-team">${prettyTeam(a.team)}</span>
     `;
     els.attendeeList.appendChild(li);
   }
 }
 
-/* Render all UI parts */
+/* Show or hide list with a filter */
+function toggleList(filter = null) {
+  const same = listVisible && currentFilter === filter;
+  if (same) {
+    els.attendeeList.hidden = true;
+    listVisible = false;
+    currentFilter = null;
+    setExpandedIndicators(null, false);
+    return;
+  }
+  currentFilter = filter;
+  listVisible = true;
+  renderAttendeeList(filter);
+  els.attendeeList.hidden = false;
+  setExpandedIndicators(filter, true);
+}
+
+/* Sync aria-expanded on controls */
+function setExpandedIndicators(filter, expanded) {
+  if (els.toggleAllBtn) els.toggleAllBtn.setAttribute('aria-expanded', String(expanded && !filter));
+  els.teamCards.forEach(card => {
+    const match = filter && card.dataset.team === filter;
+    card.setAttribute('aria-expanded', String(expanded && !!match));
+  });
+}
+
+/* Render all UI */
 function renderAll() {
   renderTotals();
   renderProgress();
-  renderAttendeeList();
+  if (listVisible) renderAttendeeList(currentFilter);
 }
 
-/* --- Utilities --- */
-
-/* Basic HTML escape for user input */
+/* Basic HTML escape */
 function escapeHTML(str) {
   return String(str)
     .replaceAll('&', '&amp;')
@@ -108,17 +132,15 @@ function escapeHTML(str) {
     .replaceAll("'", '&#039;');
 }
 
-/* Map team key to display label */
-function prettyTeam(teamKey) {
-  switch (teamKey) {
-    case 'water-wise': return 'Team Water Wise';
-    case 'net-zero': return 'Team Net Zero';
-    case 'renewables': return 'Team Renewables';
-    default: return teamKey;
-  }
+/* Map team keys to labels */
+function prettyTeam(key) {
+  return key === 'water' ? 'Team Water Wise'
+       : key === 'zero'  ? 'Team Net Zero'
+       : key === 'power' ? 'Team Renewables'
+       : key;
 }
 
-/* True if attendance goal is reached */
+/* True if goal reached */
 function isGoalReached() {
   return state.total >= ATTENDANCE_GOAL;
 }
@@ -132,42 +154,32 @@ function currentLeader() {
   return leadKey;
 }
 
-/* --- Feedback UI --- */
-
-/* Show transient greeting for check-in */
+/* Show transient greeting */
 function showGreeting(name, teamKey) {
   if (!els.greet) return;
   els.greet.textContent = `Welcome, ${name}! You’re checked in with ${prettyTeam(teamKey)}.`;
   els.greet.classList.add('show');
-  setTimeout(() => els.greet && els.greet.classList.remove('show'), 3500);
+  setTimeout(() => els.greet && els.greet.classList.remove('show'), 3000);
 }
 
-/* Show celebration banner and confetti */
+/* Show celebration banner and highlight leader */
 function showCelebration() {
   if (!els.celebration) return;
   const leader = currentLeader();
   els.celebration.textContent = leader
     ? `🎉 Goal reached! Current leader: ${prettyTeam(leader)}.`
-    : '🎉 Goal reached! It’s a tie at the top right now.';
+    : '🎉 Goal reached! It’s a tie at the top.';
   els.celebration.classList.add('on');
-  confettiBurst();
+
+  document.querySelectorAll('.team-card').forEach(c => c.classList.remove('leader'));
+  if (leader) {
+    const map = { water: '.team-card.water', zero: '.team-card.zero', power: '.team-card.power' };
+    const card = document.querySelector(map[leader]);
+    if (card) card.classList.add('leader');
+  }
+
   setTimeout(() => els.celebration && els.celebration.classList.remove('on'), 6000);
 }
-
-/* Lightweight emoji confetti burst */
-function confettiBurst() {
-  const EMOJIS = ['✨','🎉','🎊','💧','⚡','🌿'];
-  for (let i = 0; i < 24; i++) {
-    const s = document.createElement('span');
-    s.className = 'confetti';
-    s.textContent = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-    s.style.left = Math.random() * 100 + 'vw';
-    document.body.appendChild(s);
-    setTimeout(() => s.remove(), 1800 + Math.random() * 800);
-  }
-}
-
-/* --- Form handling --- */
 
 /* Handle submit: update state, render, persist */
 function onSubmit(e) {
@@ -176,9 +188,10 @@ function onSubmit(e) {
 
   const name = els.nameInput.value.trim() || 'Guest';
   const teamKey = els.teamSelect.value;
+  if (!Object.hasOwn(state.teams, teamKey)) return;
 
   state.total += 1;
-  if (teamKey in state.teams) state.teams[teamKey] += 1;
+  state.teams[teamKey] += 1;
   state.attendees.push({ name, team: teamKey, ts: Date.now() });
 
   renderAll();
@@ -190,10 +203,24 @@ function onSubmit(e) {
   els.nameInput.focus();
 }
 
-/* --- Init --- */
+/* Wire toggle interactions */
+function bindToggles() {
+  if (els.toggleAllBtn) {
+    els.toggleAllBtn.addEventListener('click', () => toggleList(null));
+  }
+  els.teamCards.forEach(card => {
+    card.addEventListener('click', () => {
+      const team = card.dataset.team;
+      toggleList(team);
+    });
+  });
+}
+
+/* Init */
 function init() {
   loadState();
   renderAll();
+  bindToggles();
   if (els.form) els.form.addEventListener('submit', onSubmit);
 }
 document.addEventListener('DOMContentLoaded', init);

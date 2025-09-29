@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Intel Sustainability Summit Check-In</title>
-    <!-- Add Font Awesome CSS -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -12,19 +11,17 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <!-- Hero section with Intel branding -->
+    <!-- Hero -->
     <div class="hero">
       <div class="hero-content">
         <img src="img/intel-logo.svg" alt="Intel Logo" class="intel-logo" />
         <h1>Team Sustainability Summit</h1>
         <div class="hero-divider"></div>
-        <p>
-          <i class="fas fa-leaf"></i> Check-in system for sustainability event
-          attendees
-        </p>
+        <p><i class="fas fa-leaf"></i> Check-in system for sustainability event attendees</p>
       </div>
     </div>
-    <!-- Attendance tracking -->
+
+    <!-- Attendance tracker -->
     <div class="attendance-tracker">
       <div class="attendance-header">
         <i class="fas fa-users"></i>
@@ -34,9 +31,13 @@
         <div id="progressBar" class="progress-bar"></div>
       </div>
     </div>
+
     <div class="container">
-      <!-- Feedback message -->
-      <p id="greeting"></p>
+      <!-- Celebration banner -->
+      <div id="celebration" class="celebration" role="status" aria-live="polite"></div>
+
+      <!-- Greeting -->
+      <p id="greeting" aria-live="polite"></p>
 
       <!-- Check-in form -->
       <form class="check-in" id="checkInForm">
@@ -65,22 +66,35 @@
 
       <!-- Team stats -->
       <div class="team-stats">
-        <h3>Team Attendance</h3>
+        <div class="team-stats-head">
+          <h3>Team Attendance</h3>
+
+          <!-- Toggle-all control -->
+          <button id="toggleAllBtn" class="btn-ghost" aria-expanded="false" aria-controls="attendee-list">
+            <i class="fas fa-list"></i> Team Attendees
+          </button>
+        </div>
+
         <div class="teams-grid">
-          <div class="team-card water">
+          <button class="team-card water" data-team="water" aria-expanded="false" aria-controls="attendee-list">
             <span class="team-name">🌊 Team Water Wise</span>
             <span class="team-count" id="waterCount">0</span>
-          </div>
-          <div class="team-card zero">
+          </button>
+
+          <button class="team-card zero" data-team="zero" aria-expanded="false" aria-controls="attendee-list">
             <span class="team-name">🌿 Team Net Zero</span>
             <span class="team-count" id="zeroCount">0</span>
-          </div>
-          <div class="team-card power">
+          </button>
+
+          <button class="team-card power" data-team="power" aria-expanded="false" aria-controls="attendee-list">
             <span class="team-name">⚡ Team Renewables</span>
             <span class="team-count" id="powerCount">0</span>
-          </div>
+          </button>
         </div>
       </div>
+
+      <!-- Collapsible attendee list -->
+      <ul id="attendee-list" hidden></ul>
     </div>
 
     <footer class="footer">
